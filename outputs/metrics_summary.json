@@ -1,0 +1,21 @@
+{
+  "kmeans": {
+    "k_opt": 3,
+    "silhouette": 0.409,
+    "davies_bouldin": 0.9109
+  },
+  "dbscan": {
+    "min_pts": 5,
+    "eps": 0.6,
+    "clusters": 2,
+    "noise_points": 12,
+    "silhouette": 0.3435,
+    "davies_bouldin": 1.1257
+  },
+  "dataset": {
+    "rows_raw": 541909,
+    "rows_clean": 397884,
+    "customers_rfm": 4338,
+    "customers_modeled": 3710
+  }
+}
