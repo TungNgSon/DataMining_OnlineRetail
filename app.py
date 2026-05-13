@@ -166,6 +166,100 @@ def format_pct(v: float) -> str:
     return f"{v:.1f}%"
 
 
+def predict_segment_for_user(recency: int, frequency: int, monetary: float, scaler, kmeans_model) -> dict:
+    """Dự đoán cụm cho khách hàng mới dựa trên R, F, M"""
+    try:
+        # Log transform (giống training pipeline)
+        freq_log = np.log1p(frequency)
+        monetary_log = np.log1p(monetary)
+        
+        # Transform using scaler
+        user_data = np.array([[recency, freq_log, monetary_log]])
+        user_scaled = scaler.transform(user_data)
+        
+        # Predict cluster
+        cluster_id = kmeans_model.predict(user_scaled)[0]
+        
+        # Tính khoảng cách đến centroid gần nhất (độ tự tin)
+        distances = kmeans_model.transform(user_scaled)[0]
+        min_dist = distances[cluster_id]
+        
+        return {
+            'cluster_id': int(cluster_id),
+            'distance': float(min_dist),
+            'success': True
+        }
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+
+
+def get_segment_label(cluster_id: int) -> tuple[str, str]:
+    """Lấy tên cụm và gợi ý hành động từ cluster ID"""
+    labels_map = {
+        0: ('Champions', 'Upsell premium bundle + loyalty rewards'),
+        1: ('At Risk Big Spenders', 'Win-back campaign with limited-time offer'),
+        2: ('Hibernating', 'Low-cost reactivation via email automation'),
+        3: ('Potential Loyalists', 'Nurture with cross-sell and onboarding series'),
+    }
+    
+    label, action = labels_map.get(cluster_id, (f'Cluster {cluster_id}', 'Standard engagement'))
+    return label, action
+
+
+# ─────────────────────────────────────────────────────────────────────
+# SIDEBAR: PREDICT SEGMENT
+# ─────────────────────────────────────────────────────────────────────
+scaler, kmeans_model = load_models()
+
+if scaler is not None and kmeans_model is not None:
+    with st.sidebar:
+        st.markdown("### 🎯 Predict Customer Segment")
+        st.caption("Nhập RFM của khách hàng để biết họ thuộc cụm nào")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            user_recency = st.number_input(
+                "Recency (days)",
+                min_value=0,
+                max_value=365,
+                value=30,
+                step=1,
+                help="Số ngày kể từ lần mua hàng cuối cùng"
+            )
+        with col2:
+            user_frequency = st.number_input(
+                "Frequency",
+                min_value=1,
+                max_value=200,
+                value=5,
+                step=1,
+                help="Số lần khách hàng mua hàng"
+            )
+        
+        user_monetary = st.number_input(
+            "Monetary",
+            min_value=0.0,
+            max_value=10000.0,
+            value=500.0,
+            step=10.0,
+            help="Tổng tiền khách hàng đã chi tiêu"
+        )
+        
+        if st.button("Predict Segment", key="predict_btn", use_container_width=True):
+            result = predict_segment_for_user(user_recency, user_frequency, user_monetary, scaler, kmeans_model)
+            
+            if result['success']:
+                cluster_id = result['cluster_id']
+                distance = result['distance']
+                segment_name, business_action = get_segment_label(cluster_id)
+                
+                st.success(f"✅ **{segment_name}**")
+                st.markdown(f"**Khoảng cách đến centroid:** {distance:.3f}")
+                st.info(f"**Hành động:** {business_action}")
+            else:
+                st.error(f"❌ Lỗi: {result['error']}")
+
+
 st.markdown(
     """
     <div class="hero">
